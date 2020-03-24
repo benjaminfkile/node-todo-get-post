@@ -32,15 +32,52 @@ const serializeTodo = todo => ({
 
 app
   .route('/v1/todos')
-  .get(/* Your code here */)
-  .post(/* Your code here */)
+
+
+
+  /********************************************************************************************************** */
+  //console.log(req.body)
+  
+  .get((req, res, next) => {
+    TodoService.getTodos(req.app.get('db'))
+      .then(todos => {
+        res.json(todos.map(serializeTodo))
+      })
+  })
+
+
+
+  /*********************************************************************************************************** */
+  .post(jsonParser, (req, res, next) => {
+
+    //console.log(req.body)
+
+    if (!req.body.title) {
+      return res.status(400).json({
+        error: { message: 'bad data' }
+      })
+    }
+
+    TodoService.insertTodo(
+      req.app.get('db'),
+      req.body)
+      .then(todo => {
+        res
+          .status(201)
+          .location(req.originalUrl + "/" + todo.id)
+          .json(serializeTodo(todo))
+      })
+  })
+
 
 app
   .route('/v1/todos/:todo_id')
+
+  /************************************************************************************************************* */
   .all((req, res, next) => {
-    if(isNaN(parseInt(req.params.todo_id))) {
+    if (!parseInt(req.params.todo_id)) {
       return res.status(404).json({
-        error: { message: `Invalid id` }
+        error: { message: 'bad id' }
       })
     }
     TodoService.getTodoById(
@@ -50,50 +87,53 @@ app
       .then(todo => {
         if (!todo) {
           return res.status(404).json({
-            error: { message: `Todo doesn't exist` }
+            error: { message: 'not found' }
           })
         }
         res.todo = todo
         next()
       })
-      .catch(next)
   })
   .get((req, res, next) => {
     res.json(serializeTodo(res.todo))
   })
+
+
+
+
+  /********************************************************************************************************* */
   .delete((req, res, next) => {
     TodoService.deleteTodo(
       req.app.get('db'),
       req.params.todo_id
     )
-      .then(numRowsAffected => {
+      .then(rows => {
         res.status(204).end()
       })
-      .catch(next)
   })
-  .patch(jsonParser, (req, res, next) => {
-    const { title, completed } = req.body
-    const todoToUpdate = { title, completed }
 
-    const numberOfValues = Object.values(todoToUpdate).filter(Boolean).length
-    if (numberOfValues === 0)
+
+
+
+  /******************************************************************************************************** */
+  .patch(jsonParser, (req, res, next) => {
+
+    if (!req.body.title)
       return res.status(400).json({
         error: {
-          message: `Request body must content either 'title' or 'completed'`
+          message: 'missing title or complete'
         }
       })
 
     TodoService.updateTodo(
       req.app.get('db'),
       req.params.todo_id,
-      todoToUpdate
+      req.body
     )
-      .then(updatedTodo => {
-        res.status(200).json(serializeTodo(updatedTodo[0]))
+      .then(todo => {
+        res.status(200).json(serializeTodo(todo[0]))
       })
-      .catch(next)
   })
-
 
 app.use(errorHandler)
 
